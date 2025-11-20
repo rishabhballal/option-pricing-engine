@@ -25,6 +25,7 @@ vanilla_put = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
 
 digital_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
     zc_bond(t,r)*norm.cdf(d2))
+    # (vanilla_call(S,K-eps,t,r,d,v) - vanilla_call(S,K+eps,t,r,d,v))/(2*eps)
 
 digital_put = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
     zc_bond(t,r)*norm.cdf(-d2))
