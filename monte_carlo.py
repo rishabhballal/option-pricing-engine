@@ -47,46 +47,39 @@ class EuropeanOption:
     @_random_seed
     def delta(self, steps, rand):
         epsilon = 0.01
-        S_1 = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
         self.stock.spot += epsilon
-        S_2 = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
+        price_eps = self.price(steps, rand)
         self.stock.spot -= epsilon
-        return math.exp(-self.stock.rate*self.expiry) * \
-            np.mean(self.payoff(S_2) - self.payoff(S_1))/epsilon
+        return (price_eps - self.price(steps, rand))/epsilon
 
     @_random_seed
     def gamma(self, steps, rand):
         epsilon = 0.01
-        delta_1 = self.delta(steps, rand)
         self.stock.spot += epsilon
-        delta_2 = self.delta(steps, rand)
+        delta_eps = self.delta(steps, rand)
         self.stock.spot -= epsilon
-        return (delta_2 - delta_1)/epsilon
+        return (delta_eps - self.delta(steps, rand))/epsilon
 
     @_random_seed
     def vega(self, steps, rand):
         epsilon = 0.001
-        S_1 = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
         self.stock.vol += epsilon
-        S_2 = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
+        price_eps = self.price(steps, rand)
         self.stock.vol -= epsilon
-        return math.exp(-self.stock.rate*self.expiry) * \
-            np.mean(self.payoff(S_2) - self.payoff(S_1))/epsilon
+        return (price_eps - self.price(steps, rand))/epsilon
 
     @_random_seed
     def rho(self, steps, rand):
         epsilon = 0.001
-        S_1 = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
         self.stock.rate += epsilon
-        S_2 = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
+        price_eps = self.price(steps, rand)
         self.stock.rate -= epsilon
-        return math.exp(-self.stock.rate*self.expiry) * \
-            np.mean(self.payoff(S_2) - self.payoff(S_1))/epsilon
+        return (price_eps - self.price(steps, rand))/epsilon
 
     @_random_seed
     def theta(self, steps, rand):
         epsilon = 0.01
-        S_1 = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
-        S_2 = self.stock.geom_brownian(self.expiry-epsilon, steps, rand)[-1]
-        return math.exp(-self.stock.rate*self.expiry) * \
-            np.mean(self.payoff(S_2) - self.payoff(S_1))/epsilon
+        self.expiry -= epsilon
+        price_eps = self.price(steps, rand)
+        self.expiry += epsilon
+        return (price_eps - self.price(steps, rand))/epsilon
