@@ -46,7 +46,7 @@ gamma_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
     (discount(t,r)*F(1,t,r,d)*n(d1))/(S*v*math.sqrt(t)))
 
 vega_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*F(S,t,r,d)*n(d1))
+    discount(t,r)*F(S,t,r,d)*math.sqrt(t)*n(d1))
 
 rho_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
     K*discount(t,r)*t*norm.cdf(d2))
