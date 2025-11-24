@@ -38,8 +38,11 @@ class EuropeanOption:
             return func(self, steps, rand)
         return wrapper
 
-    price = lambda self: math.exp(-self.stock.rate*self.expiry) * \
-        np.mean(self.payoff(self.stock.gbm_solution(self.expiry)))
+    @_random_seed
+    def price(self, steps, rand):
+        S_t = self.stock.geom_brownian(self.expiry, steps, rand)[-1]
+        return math.exp(-self.stock.rate*self.expiry) * \
+            np.mean(self.payoff(S_t))
 
     @_random_seed
     def delta(self, steps, rand):
