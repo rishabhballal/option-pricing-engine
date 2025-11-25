@@ -2,75 +2,105 @@ import math
 import numpy as np
 from scipy.stats import norm
 
-# S - spot, K - strike, t - time to expiry, r - short rate
-# d - dividend rate, v - volatility, F - forward price
+forward_contract = lambda stock, expiry, strike: \
+    stock.spot * math.exp(-stock.divid * expiry) - strike * \
+    math.exp(-stock.rate * expiry)
 
-discount = lambda t,r: math.exp(-r*t)
-F = lambda S,t,r,d: S*math.exp((r-d)*t)
-forward_contract = lambda S,K,t,r,d : discount(t,r)*(F(S,t,r,d) - K)
+_gaussian = lambda x: math.exp(-0.5 * (x**2))/math.sqrt(2 * math.pi)
 
-def auxiliary_vars(func):
-    def wrapper(S,K,t,r,d,v):
-        d1 = (math.log(S/K) + (r-d+0.5*v**2)*t)/(v*math.sqrt(t))
-        d2 = d1 - v*math.sqrt(t)
-        return func(S,K,t,r,d,v,d1,d2)
+def _normal_limits(func):
+    def wrapper(self):
+        d_1 = (math.log(self.stock.spot / self.strike) + (self.stock.rate - \
+            self.stock.divid + 0.5 * (self.stock.vol**2)) * self.expiry)/ \
+            (self.stock.vol * math.sqrt(self.expiry))
+        d_2 = d_1 - self.stock.vol * math.sqrt(self.expiry)
+        return func(self, d_1, d_2)
     return wrapper
 
+class VanillaCall:
+    def __init__(self, stock, expiry, strike):
+        self.stock = stock
+        self.strike = strike
+        self.expiry = expiry
 
-# vanilla options
+    price = _normal_limits(lambda self, d_1, d_2: \
+        self.stock.spot * math.exp(-self.stock.divid * self.expiry) * \
+        norm.cdf(d_1) - self.strike * math.exp(-self.stock.rate * \
+        self.expiry) * norm.cdf(d_2))
 
-vanilla_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*(F(S,t,r,d)*norm.cdf(d1) - K*norm.cdf(d2)))
+    delta = _normal_limits(lambda self, d_1, d_2: \
+        math.exp(-self.stock.divid * self.expiry) * norm.cdf(d_1))
 
-vanilla_put = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*(-F(S,t,r,d)*norm.cdf(-d1) + K*norm.cdf(-d2)))
-    # vanilla_call(S,K,t,r,d,v) - forward_contract(S,K,t,r,d)
+    gamma = _normal_limits(lambda self, d_1, d_2: \
+        (math.exp(-self.stock.divid * self.expiry) * _gaussian(d_1)) / \
+        (self.stock.spot * self.stock.vol * math.sqrt(self.expiry)))
 
-digital_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*norm.cdf(d2))
-    # (vanilla_call(S,K-eps,t,r,d,v) - vanilla_call(S,K+eps,t,r,d,v))/(2*eps)
+    vega = _normal_limits(lambda self, d_1, d_2: \
+        self.stock.spot * math.exp(-self.stock.divid * self.expiry) * \
+        math.sqrt(self.expiry) * _gaussian(d_1))
 
-digital_put = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*norm.cdf(-d2))
-    # discount(t,r) - digital_call(S,K,t,r,d,v)
+    rho = _normal_limits(lambda self, d_1, d_2: \
+        self.strike * math.exp(-self.stock.rate * self.expiry) * \
+        self.expiry * norm.cdf(d_2))
 
+    theta = _normal_limits(lambda self, d_1, d_2: \
+        self.stock.spot * math.exp(-self.stock.divid * self.expiry) * \
+        self.stock.divid * norm.cdf(d_1) - self.strike * \
+        math.exp(-self.stock.rate * self.expiry) * self.stock.rate * \
+        norm.cdf(d_2) - self.stock.spot * math.exp(-self.stock.divid * \
+        self.expiry) * (self.stock.vol / (2 * math.sqrt(self.expiry))) * \
+        _gaussian(d_1))
 
-# Greeks of a vanilla call option
+class VanillaPut:
+    def __init__(self, stock, expiry, strike):
+        self.stock = stock
+        self.strike = strike
+        self.expiry = expiry
 
-n = lambda x: math.exp(-x**2/2)/math.sqrt(2*math.pi)
+    price = _normal_limits(lambda self, d_1, d_2: \
+        -self.stock.spot * math.exp(-self.stock.divid * self.expiry) * \
+        norm.cdf(-d_1) + self.strike * math.exp(-self.stock.rate * \
+        self.expiry) * norm.cdf(-d_2))
 
-delta_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*F(1,t,r,d)*norm.cdf(d1))
+    delta = _normal_limits(lambda self, d_1, d_2: \
+        -math.exp(-self.stock.divid * self.expiry) * norm.cdf(-d_1))
 
-gamma_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    (discount(t,r)*F(1,t,r,d)*n(d1))/(S*v*math.sqrt(t)))
+    gamma = _normal_limits(lambda self, d_1, d_2: \
+        (math.exp(-self.stock.divid * self.expiry) * _gaussian(d_1)) / \
+        (self.stock.spot * self.stock.vol * math.sqrt(self.expiry)))
 
-vega_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*F(S,t,r,d)*math.sqrt(t)*n(d1))
+    vega = _normal_limits(lambda self, d_1, d_2: \
+        self.stock.spot * math.exp(-self.stock.divid * self.expiry) * \
+        math.sqrt(self.expiry) * _gaussian(d_1))
 
-rho_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    K*discount(t,r)*t*norm.cdf(d2))
+    rho = _normal_limits(lambda self, d_1, d_2: \
+        -self.strike * math.exp(-self.stock.rate * self.expiry) * \
+        self.expiry * norm.cdf(-d_2))
 
-theta_call = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*(F(S,t,r,d)*d*norm.cdf(d1) - K*r*norm.cdf(d2) - \
-        F(S,t,r,d)*v*n(d1)/(2*math.sqrt(t))))
+    theta = _normal_limits(lambda self, d_1, d_2: \
+        -self.stock.spot * math.exp(-self.stock.divid * self.expiry) * \
+        self.stock.divid * norm.cdf(-d_1) + self.strike * \
+        math.exp(-self.stock.rate * self.expiry) * self.stock.rate * \
+        norm.cdf(-d_2) - self.stock.spot * math.exp(-self.stock.divid * \
+        self.expiry) * (self.stock.vol / (2 * math.sqrt(self.expiry))) * \
+        _gaussian(d_1))
 
+class DigitalCall:
+    def __init__(self, stock, expiry, strike):
+        self.stock = stock
+        self.strike = strike
+        self.expiry = expiry
 
-# Greeks of a vanilla put option
+    price = _normal_limits(lambda self, d_1, d_2: \
+        math.exp(-self.stock.rate * self.expiry) * norm.cdf(d_2))
 
-delta_put = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    -discount(t,r)*F(1,t,r,d)*norm.cdf(-d1))
-    # delta_call(S,K,t,r,d,v) - math.exp(-d*t)
+class DigitalPut:
+    def __init__(self, stock, expiry, strike):
+        self.stock = stock
+        self.strike = strike
+        self.expiry = expiry
 
-gamma_put = gamma_call
+    price = _normal_limits(lambda self, d_1, d_2: \
+        math.exp(-self.stock.rate * self.expiry) * norm.cdf(-d_2))
 
-vega_put = vega_call
-
-rho_put = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    -K*discount(t,r)*t*norm.cdf(-d2))
-    # rho_call(S,K,t,r,d,v) - K*discount(t,r)*t
-
-theta_put = auxiliary_vars(lambda S,K,t,r,d,v,d1,d2: \
-    discount(t,r)*(-F(S,t,r,d)*d*norm.cdf(-d1) + K*r*norm.cdf(-d2) - \
-        F(S,t,r,d)*v*n(d1)/(2*math.sqrt(t))))
-    # theta_call(S,K,t,r,d,v) - discount(t,r)*(F(S,t,r,d)*d - K*r)
+# add greeks for digital options
