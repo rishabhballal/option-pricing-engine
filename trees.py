@@ -76,3 +76,22 @@ class EuropeanOption:
         price_eps = self.price(steps)
         self.expiry -= epsilon
         return -(price_eps - self.price(steps)) / epsilon
+
+class AmericanOption:
+    def __init__(self, stock, expiry, payoff):
+        self.stock = stock
+        self.expiry = expiry
+        self.payoff = lambda S: np.array([payoff(x) for x in S])
+
+    def price(self, steps=15):
+        S = self.stock.geom_brownian(self.expiry, steps)
+        intrinsic_value = np.vstack([self.payoff(x) for x in S])
+        P = np.zeros((steps+1, 2**steps))
+        P[-1] = self.payoff(S[-1])
+        for i in range(1, steps+1):
+            for j in range(0, 2**steps, 2**i):
+                for k in range(2**i):
+                    P[steps-i, j+k] = max(intrinsic_value[steps-i, j+k], \
+                        math.exp(-self.stock.rate * self.expiry / steps) * \
+                        np.mean(P[steps-i+1, j:j+2**i]))
+        return P[0,0]
