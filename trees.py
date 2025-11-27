@@ -10,88 +10,45 @@ class Stock:
         self.divid = divid
         self.vol = vol
 
-    def geom_brownian(self, time=1, steps=3):
-        S = np.ones((steps+1, 2**steps)) * math.log(self.spot)
-        for i in range(steps):
-            for j in range(2**steps):
-                if j % 2**(steps-i) < 2**(steps-i-1):
-                    S[i+1,j] = S[i,j] + (self.rate - self.divid - 0.5 * \
-                        self.vol**2) * time / steps + self.vol * \
-                        math.sqrt(time / steps)
-                else:
-                    S[i+1,j] = S[i,j] + (self.rate - self.divid - 0.5 * \
-                        self.vol**2) * time / steps - self.vol * \
-                        math.sqrt(time / steps)
-        return np.exp(S)
+    def geom_brownian(self, time=1, steps=500):
+        self.up = math.exp(self.vol * math.sqrt(time / steps))
+        self.down = 1/self.up
+        self.pr = (math.exp(self.rate * time / steps) - self.down) / \
+            (self.up - self.down)
+        S = [[self.spot]*(i+1) for i in range(steps+1)]
+        for i in range(1, steps+1):
+            for j in range(i+1):
+                S[i][j] *= self.up**(i-j) * self.down**j
+        return S
 
 class EuropeanOption:
     def __init__(self, stock, expiry, payoff):
         self.stock = stock
         self.expiry = expiry
-        self.payoff = lambda S: np.array([payoff(x) for x in S])
+        self.payoff = lambda S: [payoff(x) for x in S]
 
-    def price(self, steps=18):
-        S_T1 = self.stock.geom_brownian(self.expiry, steps)[-1]
-        if steps==1:
-            S_T2 = S_T1
-        else:
-            S_T2 = self.stock.geom_brownian(self.expiry, steps-1)[-1]
-        return math.exp(-self.stock.rate*self.expiry) * \
-            (np.mean(self.payoff(S_T1)) + np.mean(self.payoff(S_T2))) / 2
-
-    def delta(self, steps=18):
-        epsilon = 0.01
-        self.stock.spot += epsilon
-        price_eps = self.price(steps)
-        self.stock.spot -= epsilon
-        return (price_eps - self.price(steps)) / epsilon
-
-    def gamma(self, steps=18):
-        epsilon = 10
-        # why does it only work with a large epsilon?
-        self.stock.spot += epsilon
-        price_plus = self.price(steps)
-        self.stock.spot -= 2*epsilon
-        price_minus = self.price(steps)
-        self.stock.spot += epsilon
-        return (price_plus - 2*self.price(steps) + price_minus) / epsilon**2
-
-    def vega(self, steps=18):
-        epsilon = 0.0001
-        self.stock.vol += epsilon
-        price_eps = self.price(steps)
-        self.stock.vol -= epsilon
-        return (price_eps - self.price(steps)) / epsilon
-
-    def rho(self, steps=18):
-        epsilon = 0.0001
-        self.stock.rate += epsilon
-        price_eps = self.price(steps)
-        self.stock.rate -= epsilon
-        return (price_eps - self.price(steps)) / epsilon
-
-    def theta(self, steps=18):
-        epsilon = 0.01
-        self.expiry += epsilon
-        price_eps = self.price(steps)
-        self.expiry -= epsilon
-        return -(price_eps - self.price(steps)) / epsilon
+    def price(self, steps=1000):
+        S = self.stock.geom_brownian(self.expiry, steps)
+        value = [self.payoff(x) for x in S]
+        for i in reversed(range(steps)):
+            for j in range(i+1):
+                value[i][j] = math.exp(-self.stock.rate * self.expiry / steps) \
+                    * (self.stock.pr * value[i+1][j] + (1 - self.stock.pr) * \
+                    value[i+1][j+1])
+        return value[0][0]
 
 class AmericanOption:
     def __init__(self, stock, expiry, payoff):
         self.stock = stock
         self.expiry = expiry
-        self.payoff = lambda S: np.array([payoff(x) for x in S])
+        self.payoff = lambda S: [payoff(x) for x in S]
 
-    def price(self, steps=15):
+    def price(self, steps=1000):
         S = self.stock.geom_brownian(self.expiry, steps)
-        intrinsic_value = np.vstack([self.payoff(x) for x in S])
-        P = np.zeros((steps+1, 2**steps))
-        P[-1] = self.payoff(S[-1])
-        for i in range(1, steps+1):
-            for j in range(0, 2**steps, 2**i):
-                for k in range(2**i):
-                    P[steps-i, j+k] = max(intrinsic_value[steps-i, j+k], \
-                        math.exp(-self.stock.rate * self.expiry / steps) * \
-                        np.mean(P[steps-i+1, j:j+2**i]))
-        return P[0,0]
+        value = [self.payoff(x) for x in S]
+        for i in reversed(range(steps)):
+            for j in range(i+1):
+                value[i][j] = max(value[i][j], math.exp(-self.stock.rate * \
+                    self.expiry / steps) * (self.stock.pr * value[i+1][j] + \
+                    (1 - self.stock.pr) * value[i+1][j+1]))
+        return value[0][0]
