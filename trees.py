@@ -1,8 +1,6 @@
 import math
 import numpy as np
 
-rng = np.random.default_rng()
-
 class Stock:
     def __init__(self, spot=100, rate=0.05, divid=0.03, vol=0.10):
         self.spot = spot
@@ -13,9 +11,9 @@ class Stock:
     def geom_brownian(self, time=1, steps=1000):
         self.up = math.exp(self.vol * math.sqrt(time / steps))
         self.down = 1/self.up
-        self.pr = (math.exp(self.rate * time / steps) - self.down) / \
-            (self.up - self.down)
-        S = [[self.spot]*(i+1) for i in range(steps+1)]
+        self.pr = (math.exp((self.rate - self.divid) * time / steps) - \
+            self.down) / (self.up - self.down)
+        S = [[self.spot] * (i+1) for i in range(steps+1)]
         for i in range(1, steps+1):
             for j in range(i+1):
                 S[i][j] *= self.up**(i-j) * self.down**j
@@ -59,8 +57,8 @@ class BermudanOption:
         self.times = times
         self.payoff = lambda S: [payoff(x) for x in S]
 
-    def price(self, steps=100):
-        total_steps = steps * len(self.times)
+    def price(self, steps_=100):
+        total_steps = steps_ * len(self.times)
         dt = self.times[-1] / total_steps
         S = self.stock.geom_brownian(self.times[-1], total_steps)
         value = [self.payoff(x) for x in S]
