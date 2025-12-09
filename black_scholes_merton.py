@@ -18,7 +18,7 @@ class VanillaCall:
     def __init__(self, stock, expiry, strike):
         self.stock = stock
         self.strike = strike
-        self.expiry = expiry
+        self.expiry = expiry / 252
 
     @_normal_cdf_limits
     def price(self, d_1, d_2): \
@@ -58,7 +58,7 @@ class VanillaPut:
     def __init__(self, stock, expiry, strike):
         self.stock = stock
         self.strike = strike
-        self.expiry = expiry
+        self.expiry = expiry / 252
 
     @_normal_cdf_limits
     def price(self, d_1, d_2): \
