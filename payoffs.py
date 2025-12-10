@@ -1,7 +1,6 @@
 import numpy as np
 
-# some payoffs for instantiating trees.EuropeanOption, trees.AmericanOption,
-# trees.BermudanOption, monte_carlo.PathIndependentEuropeanOption
+# path-independent payoff examples
 
 def forward_contract(strike):
     return (lambda spot: spot - strike)
@@ -24,8 +23,7 @@ def power_put(strike, power):
 def straddle(strike):
     return (lambda spot: max(spot - strike, strike - spot))
 
-
-# some payoffs for instantiating monte_carlo.PathDependentEuropeanOption
+# path-dependent payoff examples
 
 def fixed_lookback_call(strike):
     return (lambda path: max(np.max(path) - strike, 0))
