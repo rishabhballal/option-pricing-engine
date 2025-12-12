@@ -24,11 +24,9 @@ class EuropeanOption:
     @_random_seed
     def price(self, rand):
         paths = self.stock.gbm_paths(self.expiry, rand)
-        for i in reversed(range(self.expiry + 1)):
-            if i not in self.path_times:
-                paths = np.delete(paths, i, axis=0)
+        reduced_paths = np.array([paths[t] for t in self.path_times])
         return math.exp(-self.stock.rate * self.expiry * stocks.dt) * \
-            np.mean(self.payoff(paths))
+            np.mean(self.payoff(reduced_paths))
 
     @_random_seed
     def delta(self, rand):
